@@ -1,9 +1,21 @@
 use emailer::config::{read_config, Config};
+use emailer::telemetry::init_logging;
+use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 use uuid::Uuid;
 
+static TRACING: Lazy<()> = Lazy::new(|| {
+    if std::env::var("TEST_LOG").is_ok() {
+        init_logging("test", "debug", std::io::stdout);
+    } else {
+        init_logging("test", "debug", std::io::sink);
+    }
+});
+
 async fn spawn_app() -> (String, PgPool) {
+    Lazy::force(&TRACING);
+
     let mut config = read_config().expect("Failed to read config file");
     config.database.database_name = Uuid::new_v4().to_string();
     let connection_pool = configure_database(&config).await;
