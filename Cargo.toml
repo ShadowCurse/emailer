@@ -13,13 +13,15 @@ path = "src/main.rs"
 name = "emailer"
 
 [dependencies]
+config = "0.12"
+uuid = { version = "0.8.2", features = ["v4"] }
+chrono = "0.4.19"
+unicode-segmentation = "1.9.0"
+validator = "0.14.0"
 actix-web = "4.0.0"
 actix-http = "3.0.0"
 serde = { version = "1", features = ["derive"] }
 serde-aux = "3.0.1" 
-config = "0.12"
-uuid = { version = "0.8.2", features = ["v4"] }
-chrono = "0.4.19"
 tracing = { version = "0.1.32", features = ["log"] }
 tracing-futures = "0.2.5"
 tracing-log = "0.1.2"

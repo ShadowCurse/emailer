@@ -1,3 +1,4 @@
+use crate::domain::NewSubscriber;
 use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use serde::Deserialize;
@@ -22,7 +23,11 @@ pub async fn subscribe(
     form: web::Form<FormData>,
     connection_pool: web::Data<PgPool>,
 ) -> HttpResponse {
-    match insert_subscriber(&form, &connection_pool).await {
+    let new_sub = match NewSubscriber::new(form.0.name, form.0.email) {
+        Ok(new_sub) => new_sub,
+        Err(_) => return HttpResponse::BadRequest().finish(),
+    };
+    match insert_subscriber(&connection_pool, &new_sub).await {
         Ok(_) => HttpResponse::Ok().finish(),
         Err(_) => HttpResponse::InternalServerError().finish(),
     }
@@ -30,11 +35,11 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = "Inserting subscriber data in database",
-    skip(form, connection_pool)
+    skip(connection_pool, new_sub)
 )]
 pub async fn insert_subscriber(
-    form: &FormData,
     connection_pool: &PgPool,
+    new_sub: &NewSubscriber,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
         r#"
@@ -42,8 +47,8 @@ pub async fn insert_subscriber(
         values ($1, $2, $3, $4)
         "#,
         Uuid::new_v4(),
-        form.email,
-        form.name,
+        new_sub.email.as_ref(),
+        new_sub.name.as_ref(),
         Utc::now()
     )
     .execute(connection_pool)

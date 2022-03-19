@@ -99,6 +99,9 @@ async fn subscribe_ret_400_if_invalid_form() {
         ("name=pog%20dog", "missing email"),
         ("email=pogolius%40gmail.com", "missing name"),
         ("", "missing name, and email"),
+        ("name=&email=pogolius%40gmail.com", "invalid name"),
+        ("name=pogdog&email=some_mail_address", "invalid email"),
+        ("name=pog%20dog&email=", "invalid email"),
     ];
 
     for (form, error) in invalid_forms {
