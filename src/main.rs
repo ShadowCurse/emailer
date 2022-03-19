@@ -7,11 +7,9 @@ async fn main() -> std::io::Result<()> {
 
     let config = read_config().expect("Failed to read config");
     let connection = config.database.connection();
-    let connection_pool = PgPool::connect(&connection)
-        .await
-        .expect("Failed to connect to Postgres");
+    let connection_pool = PgPool::connect_lazy(&connection).expect("Failed to connect to Postgres");
 
-    let listener = std::net::TcpListener::bind(format!("127.0.0.1:{}", config.application_port))
+    let listener = std::net::TcpListener::bind(config.application.address())
         .expect("Unable to bind port");
     run(listener, connection_pool)?.await
 }
