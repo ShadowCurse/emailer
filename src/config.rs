@@ -1,4 +1,6 @@
 use serde::Deserialize;
+use serde_aux::field_attributes::deserialize_number_from_string;
+use sqlx::postgres::{PgSslMode, PgConnectOptions};
 
 #[derive(Deserialize)]
 pub struct Config {
@@ -10,28 +12,35 @@ pub struct Config {
 pub struct DatabaseConfig {
     pub username: String,
     pub password: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
     pub database_name: String,
+    pub require_ssl: bool,
 }
 
 impl DatabaseConfig {
-    pub fn connection(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}:{}/{}",
-            self.username, self.password, self.host, self.port, self.database_name
-        )
+    pub fn with_db(&self) -> PgConnectOptions {
+        self.without_db().database(&self.database_name)
     }
-    pub fn connection_no_db(&self) -> String {
-        format!(
-            "postgres://{}:{}@{}:{}",
-            self.username, self.password, self.host, self.port
-        )
+    pub fn without_db(&self) -> PgConnectOptions {
+        let ssl_mode = if self.require_ssl {
+            PgSslMode::Require
+        } else {
+            PgSslMode::Prefer
+        };
+        PgConnectOptions::new()
+            .host(&self.host)
+            .username(&self.username)
+            .password(&self.password)
+            .port(self.port)
+            .ssl_mode(ssl_mode)
     }
 }
 
 #[derive(Deserialize)]
 pub struct AppConfig {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub port: u16,
     pub host: String,
 }
@@ -81,6 +90,7 @@ pub fn read_config() -> Result<Config, config::ConfigError> {
 
     let builder = config::Config::builder()
         .add_source(config::File::from(config_dir.join("base.yaml")).required(true))
-        .add_source(config::File::from(config_dir.join(Into::<&str>::into(env))).required(true));
+        .add_source(config::File::from(config_dir.join(Into::<&str>::into(env))).required(true))
+        .add_source(config::Environment::with_prefix("app").separator("__"));
     builder.build()?.try_deserialize()
 }

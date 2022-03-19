@@ -29,7 +29,7 @@ async fn spawn_app() -> (String, PgPool) {
 }
 
 pub async fn configure_database(config: &Config) -> PgPool {
-    let mut connection = PgConnection::connect(&config.database.connection_no_db())
+    let mut connection = PgConnection::connect_with(&config.database.without_db())
         .await
         .expect("Failed to connect to Postgres");
     connection
@@ -37,7 +37,7 @@ pub async fn configure_database(config: &Config) -> PgPool {
         .await
         .expect("Failed to create database");
 
-    let connection_pool = PgPool::connect(&config.database.connection())
+    let connection_pool = PgPool::connect_with(config.database.with_db())
         .await
         .expect("Failed to connect to Postgres");
     sqlx::migrate!("./migrations")
