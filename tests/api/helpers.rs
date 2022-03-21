@@ -1,9 +1,8 @@
 use emailer::config::{read_config, Config};
-use emailer::email_client::EmailClient;
 use emailer::telemetry::init_logging;
+use emailer::startup::AppServer;
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 use uuid::Uuid;
 
 static TRACING: Lazy<()> = Lazy::new(|| {
@@ -19,23 +18,14 @@ pub async fn spawn_app() -> (String, PgPool) {
 
     let mut config = read_config().expect("Failed to read config file");
     config.database.database_name = Uuid::new_v4().to_string();
+    config.application.port = 0;
+
     let connection_pool = configure_database(&config).await;
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("Unable to bind random port");
-    let port = listener.local_addr().unwrap().port();
+    let server = AppServer::build(config).await.unwrap();
+    let port = server.port();
 
-    let sender = config.email_client.sender().expect("Invalid sender email");
-    let email_client = EmailClient::new(
-        config.email_client.base_url,
-        sender,
-        config.email_client.auth_token,
-        std::time::Duration::from_secs(1),
-    );
-
-    let server = emailer::startup::run(listener, connection_pool.clone(), email_client)
-        .expect("Failed to create server");
-
-    let _ = tokio::spawn(server);
+    let _ = tokio::spawn(server.run());
     (format!("http://127.0.0.1:{port}"), connection_pool)
 }
 

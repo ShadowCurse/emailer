@@ -1,20 +1,27 @@
 use crate::helpers;
 
-#[actix_rt::test]
-async fn subscribe_ret_200_if_valid_form() {
-    let (addr, pool) = helpers::spawn_app().await;
-
-    let client = reqwest::Client::new();
-    let body = "name=pog%20dog&email=pogolius%40gmail.com";
-
-    let responce = client
+async fn client_post_subsciptions(
+    client: &reqwest::Client,
+    addr: &str,
+    body: String,
+) -> reqwest::Response {
+    client
         .post(&format!("{addr}/subscriptions"))
         .header("Content-Type", "application/x-www-form-urlencoded")
         .body(body)
         .send()
         .await
-        .expect("Failed to execute request");
+        .expect("Failed to execute request")
+}
 
+#[actix_rt::test]
+async fn subscribe_ret_200_if_valid_form() {
+    let (addr, pool) = helpers::spawn_app().await;
+
+    let client = reqwest::Client::new();
+    let body = "name=pog%20dog&email=pogolius%40gmail.com".to_string();
+
+    let responce = client_post_subsciptions(&client, &addr, body).await;
     assert_eq!(responce.status().as_u16(), 200);
 
     let saved = sqlx::query!("select email, name from subscriptions")
@@ -41,13 +48,7 @@ async fn subscribe_ret_400_if_invalid_form() {
     ];
 
     for (form, error) in invalid_forms {
-        let responce = client
-            .post(&format!("{addr}/subscriptions"))
-            .header("Content-Type", "application/x-www-form-urlencoded")
-            .body(form)
-            .send()
-            .await
-            .expect("Failed to execute request");
+        let responce = client_post_subsciptions(&client, &addr, form.to_string()).await;
 
         assert_eq!(
             responce.status().as_u16(),
