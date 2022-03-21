@@ -1,11 +1,13 @@
+use crate::domain::SubscriberEmail;
 use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
-use sqlx::postgres::{PgSslMode, PgConnectOptions};
+use sqlx::postgres::{PgConnectOptions, PgSslMode};
 
 #[derive(Deserialize)]
 pub struct Config {
     pub application: AppConfig,
     pub database: DatabaseConfig,
+    pub email_client: EmailClientConfig,
 }
 
 #[derive(Deserialize)]
@@ -48,6 +50,19 @@ pub struct AppConfig {
 impl AppConfig {
     pub fn address(&self) -> String {
         format!("{}:{}", self.host, self.port)
+    }
+}
+
+#[derive(Deserialize)]
+pub struct EmailClientConfig {
+    pub base_url: String,
+    pub sender_email: String,
+    pub auth_token: String,
+}
+
+impl EmailClientConfig {
+    pub fn sender(&self) -> Result<SubscriberEmail, String> {
+        self.sender_email.clone().try_into()
     }
 }
 

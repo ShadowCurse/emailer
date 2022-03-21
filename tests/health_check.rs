@@ -1,4 +1,5 @@
 use emailer::config::{read_config, Config};
+use emailer::email_client::EmailClient;
 use emailer::telemetry::init_logging;
 use once_cell::sync::Lazy;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
@@ -22,8 +23,17 @@ async fn spawn_app() -> (String, PgPool) {
 
     let listener = TcpListener::bind("127.0.0.1:0").expect("Unable to bind random port");
     let port = listener.local_addr().unwrap().port();
-    let server =
-        emailer::startup::run(listener, connection_pool.clone()).expect("Failed to create server");
+
+    let sender = config.email_client.sender().expect("Invalid sender email");
+    let email_client = EmailClient::new(
+        config.email_client.base_url,
+        sender,
+        config.email_client.auth_token,
+    );
+
+    let server = emailer::startup::run(listener, connection_pool.clone(), email_client)
+        .expect("Failed to create server");
+
     let _ = tokio::spawn(server);
     (format!("http://127.0.0.1:{port}"), connection_pool)
 }
