@@ -17,6 +17,7 @@ async fn main() -> std::io::Result<()> {
         config.email_client.base_url,
         sender,
         config.email_client.auth_token,
+        std::time::Duration::from_secs(5),
     );
 
     let listener =

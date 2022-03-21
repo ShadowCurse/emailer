@@ -29,6 +29,7 @@ async fn spawn_app() -> (String, PgPool) {
         config.email_client.base_url,
         sender,
         config.email_client.auth_token,
+        std::time::Duration::from_secs(1),
     );
 
     let server = emailer::startup::run(listener, connection_pool.clone(), email_client)
