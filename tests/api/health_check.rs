@@ -2,12 +2,12 @@ use crate::helpers;
 
 #[actix_rt::test]
 async fn health_check_test() {
-    let (addr, _) = helpers::spawn_app().await;
+    let test_app = helpers::spawn_app().await;
 
     let client = reqwest::Client::new();
 
     let responce = client
-        .get(format!("{addr}/health_check"))
+        .get(format!("{}/health_check", test_app.address))
         .send()
         .await
         .expect("Failed to execute request");
