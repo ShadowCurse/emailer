@@ -2,25 +2,9 @@ use crate::helpers;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, ResponseTemplate};
 
-async fn client_post_subsciptions(
-    client: &reqwest::Client,
-    addr: &str,
-    body: String,
-) -> reqwest::Response {
-    client
-        .post(&format!("{addr}/subscriptions"))
-        .header("Content-Type", "application/x-www-form-urlencoded")
-        .body(body)
-        .send()
-        .await
-        .expect("Failed to execute request")
-}
-
 #[actix_rt::test]
 async fn subscribe_sends_confirmation_email() {
     let test_app = helpers::spawn_app().await;
-
-    let client = reqwest::Client::new();
     let body = "name=pog%20dog&email=pogolius%40gmail.com".to_string();
 
     Mock::given(path("/email"))
@@ -30,7 +14,7 @@ async fn subscribe_sends_confirmation_email() {
         .mount(&test_app.email_server)
         .await;
 
-    let _ = client_post_subsciptions(&client, &test_app.address, body).await;
+    let _ = test_app.post_subsciptions(body).await;
 
     let email_request = &test_app.email_server.received_requests().await.unwrap()[0];
     let body: serde_json::Value = serde_json::from_slice(&email_request.body).unwrap();
@@ -52,8 +36,6 @@ async fn subscribe_sends_confirmation_email() {
 #[actix_rt::test]
 async fn subscribe_ret_200_if_valid_form() {
     let test_app = helpers::spawn_app().await;
-
-    let client = reqwest::Client::new();
     let body = "name=pog%20dog&email=pogolius%40gmail.com".to_string();
 
     Mock::given(path("/email"))
@@ -63,7 +45,7 @@ async fn subscribe_ret_200_if_valid_form() {
         .mount(&test_app.email_server)
         .await;
 
-    let responce = client_post_subsciptions(&client, &test_app.address, body).await;
+    let responce = test_app.post_subsciptions(body).await;
     assert_eq!(responce.status().as_u16(), 200);
 
     let saved = sqlx::query!("select email, name, status from subscriptions")
@@ -80,7 +62,6 @@ async fn subscribe_ret_200_if_valid_form() {
 async fn subscribe_ret_400_if_invalid_form() {
     let test_app = helpers::spawn_app().await;
 
-    let client = reqwest::Client::new();
     let invalid_forms = vec![
         ("name=pog%20dog", "missing email"),
         ("email=pogolius%40gmail.com", "missing name"),
@@ -91,7 +72,7 @@ async fn subscribe_ret_400_if_invalid_form() {
     ];
 
     for (form, error) in invalid_forms {
-        let responce = client_post_subsciptions(&client, &test_app.address, form.to_string()).await;
+        let responce = test_app.post_subsciptions(form.to_string()).await;
 
         assert_eq!(
             responce.status().as_u16(),

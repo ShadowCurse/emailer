@@ -52,6 +52,7 @@ impl AppServer {
                 .wrap(TracingLogger::default())
                 .route("/health_check", web::get().to(health_check))
                 .route("/subscriptions", web::post().to(subscribe))
+                .route("/subscriptions/confirm", web::get().to(confirm))
                 .app_data(connection_pool.clone())
                 .app_data(email_client.clone())
         })
