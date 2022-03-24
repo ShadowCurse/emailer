@@ -11,6 +11,9 @@ pub struct AppServer {
     server: Server,
 }
 
+#[derive(Debug)]
+pub struct AppBaseUrl(pub String);
+
 impl AppServer {
     pub async fn build(config: Config) -> Result<Self, std::io::Error> {
         let connection = config.database.with_db();
@@ -27,7 +30,12 @@ impl AppServer {
         let listener =
             TcpListener::bind(config.application.address()).expect("Unable to bind port");
         let port = listener.local_addr().unwrap().port();
-        let server = Self::running_server(listener, connection_pool, email_client)?;
+        let server = Self::running_server(
+            listener,
+            connection_pool,
+            email_client,
+            config.application.base_url,
+        )?;
 
         Ok(Self { port, server })
     }
@@ -38,15 +46,17 @@ impl AppServer {
 
     pub async fn run(self) -> Result<(), std::io::Error> {
         self.server.await
-    } 
+    }
 
     fn running_server(
         listener: TcpListener,
         connection_pool: PgPool,
         email_client: EmailClient,
+        base_url: String,
     ) -> Result<Server, std::io::Error> {
         let connection_pool = web::Data::new(connection_pool);
         let email_client = web::Data::new(email_client);
+        let base_url = web::Data::new(AppBaseUrl(base_url));
         let server = HttpServer::new(move || {
             App::new()
                 .wrap(TracingLogger::default())
@@ -55,6 +65,7 @@ impl AppServer {
                 .route("/subscriptions/confirm", web::get().to(confirm))
                 .app_data(connection_pool.clone())
                 .app_data(email_client.clone())
+                .app_data(base_url.clone())
         })
         .listen(listener)?
         .run();
