@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Deserialize;
-use sqlx::{PgPool, Acquire, Executor, Postgres, Transaction};
+use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -13,6 +13,15 @@ pub struct FormData {
     email: String,
     name: String,
 }
+
+impl TryFrom<FormData> for NewSubscriber {
+    type Error = String;
+
+    fn try_from(value: FormData) -> Result<Self, Self::Error> {
+        NewSubscriber::new(value.name, value.email)
+    }
+}
+
 
 #[tracing::instrument(
     name = "Adding a new subscriber",
@@ -28,7 +37,7 @@ pub async fn subscribe(
     email_client: web::Data<EmailClient>,
     base_url: web::Data<AppBaseUrl>,
 ) -> HttpResponse {
-    let new_sub = match NewSubscriber::new(form.0.name, form.0.email) {
+    let new_sub = match NewSubscriber::try_from(form.0) {
         Ok(new_sub) => new_sub,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
