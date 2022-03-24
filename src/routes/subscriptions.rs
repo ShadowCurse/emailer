@@ -5,7 +5,7 @@ use actix_web::{web, HttpResponse};
 use chrono::Utc;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use serde::Deserialize;
-use sqlx::PgPool;
+use sqlx::{PgPool, Acquire, Executor, Postgres, Transaction};
 use uuid::Uuid;
 
 #[derive(Deserialize)]
@@ -32,16 +32,24 @@ pub async fn subscribe(
         Ok(new_sub) => new_sub,
         Err(_) => return HttpResponse::BadRequest().finish(),
     };
-    let sub_id = match insert_subscriber(&connection_pool, &new_sub).await {
+    let mut transaction = match connection_pool.begin().await {
+        Ok(transaction) => transaction,
+        Err(_) => return HttpResponse::InternalServerError().finish(),
+    };
+    let sub_id = match insert_subscriber(&mut transaction, &new_sub).await {
         Ok(sub_id) => sub_id,
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
     let sub_token = generate_sub_token();
 
-    if store_token(&connection_pool, sub_id, &sub_token)
+    if store_token(&mut transaction, sub_id, &sub_token)
         .await
         .is_err()
     {
+        return HttpResponse::InternalServerError().finish();
+    }
+
+    if transaction.commit().await.is_err() {
         return HttpResponse::InternalServerError().finish();
     }
 
@@ -57,10 +65,10 @@ pub async fn subscribe(
 
 #[tracing::instrument(
     name = "Inserting subscriber data in database",
-    skip(connection_pool, new_sub)
+    skip(connection, new_sub)
 )]
 pub async fn insert_subscriber(
-    connection_pool: &PgPool,
+    connection: &mut Transaction<'_, Postgres>,
     new_sub: &NewSubscriber,
 ) -> Result<Uuid, sqlx::Error> {
     let sub_id = Uuid::new_v4();
@@ -74,7 +82,7 @@ pub async fn insert_subscriber(
         new_sub.name.as_ref(),
         Utc::now()
     )
-    .execute(connection_pool)
+    .execute(connection)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
@@ -85,10 +93,10 @@ pub async fn insert_subscriber(
 
 #[tracing::instrument(
     name = "Stores new token of a new sub",
-    skip(connection_pool, sub_id, sub_token)
+    skip(connection, sub_id, sub_token)
 )]
 pub async fn store_token(
-    connection_pool: &PgPool,
+    connection: &mut Transaction<'_, Postgres>,
     sub_id: Uuid,
     sub_token: &str,
 ) -> Result<(), sqlx::Error> {
@@ -97,7 +105,7 @@ pub async fn store_token(
         sub_token,
         sub_id
     )
-    .execute(connection_pool)
+    .execute(connection)
     .await
     .map_err(|e| {
         tracing::error!("Failed to execute query: {:?}", e);
