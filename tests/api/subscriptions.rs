@@ -70,3 +70,18 @@ async fn subscribe_ret_400_if_invalid_form() {
         );
     }
 }
+
+#[actix_rt::test]
+async fn subscribe_fails_if_database_error() {
+    let test_app = helpers::spawn_app().await;
+    let body = "name=pog%20dog&email=pogolius%40gmail.com".to_string();
+
+    sqlx::query!("alter table subscription_tokens drop column subscription_token")
+        .execute(&test_app.db_pool)
+        .await
+        .unwrap();
+
+    let responce = test_app.post_subsciptions(body).await;
+
+    assert_eq!(responce.status().as_u16(), 500);
+}
