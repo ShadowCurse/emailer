@@ -13,3 +13,8 @@ create table subscription_tokens(
     references subscriptions (id),
   primary key (subscription_token)
 );
+create table users(
+  user_id uuid primary key,
+  username text not null unique,
+  password_hash text not null
+)

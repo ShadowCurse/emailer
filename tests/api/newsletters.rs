@@ -1,6 +1,33 @@
 use crate::helpers::{spawn_app, Links, TestApp};
+use uuid::Uuid;
 use wiremock::matchers::{any, method, path};
 use wiremock::{Mock, ResponseTemplate};
+
+#[actix_rt::test]
+async fn request_missing_auth_rejected() {
+    let test_app = spawn_app().await;
+
+    let newsletter_req_body = serde_json::json!({
+        "title": "Newsletter titile",
+        "content": {
+            "text": "Text body",
+            "html": "<p>Html body</p>",
+        }
+    });
+
+    let response = reqwest::Client::new()
+        .post(&format!("{}/newsletters", &test_app.address))
+        .json(&newsletter_req_body)
+        .send()
+        .await
+        .expect("Failed to execute request");
+
+    assert_eq!(response.status().as_u16(), 401);
+    assert_eq!(
+        response.headers()["WWW-Authenticate"],
+        "Basic realm=\"publish\""
+    );
+}
 
 #[actix_rt::test]
 async fn newsletter_are_not_send_to_unconfirmed_subs() {
@@ -23,6 +50,7 @@ async fn newsletter_are_not_send_to_unconfirmed_subs() {
     let response = reqwest::Client::new()
         .post(&format!("{}/newsletters", &test_app.address))
         .json(&newsletter_req_body)
+        .basic_auth(Uuid::new_v4().to_string(), Some(Uuid::new_v4().to_string()))
         .send()
         .await
         .expect("Failed to execute request");
@@ -51,6 +79,7 @@ async fn newsletter_are_send_to_confirmed_subs() {
     let response = reqwest::Client::new()
         .post(&format!("{}/newsletters", &test_app.address))
         .json(&newsletter_req_body)
+        .basic_auth(Uuid::new_v4().to_string(), Some(Uuid::new_v4().to_string()))
         .send()
         .await
         .expect("Failed to execute request");
